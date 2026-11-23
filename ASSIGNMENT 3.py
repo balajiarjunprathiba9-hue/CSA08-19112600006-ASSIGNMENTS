@@ -4,13 +4,9 @@ import re
 # Define titles to remove from contact names
 TITLES = {"dr", "mr", "mrs", "ms", "miss", "prof"}
 
-def normalize_phone(raw):
-    """
-    '+91 98765-43210', '09876543210', '91 9876543210'
-    -> '9876543210'.
 
-    Returns None when fewer than 10 digits are present.
-    """
+# Normalize phone numbers
+def normalize_phone(raw):
     digits = re.sub(r"\D", "", raw or "")
 
     if len(digits) < 10:
@@ -19,11 +15,8 @@ def normalize_phone(raw):
     return digits[-10:]
 
 
+# Normalize names
 def normalize_name(raw):
-    """
-    'Dr. Ravi' -> 'ravi'
-    '  RAVI   Kumar ' -> 'ravi kumar'
-    """
     words = re.findall(r"[a-z0-9]+", (raw or "").lower())
 
     return " ".join(
@@ -31,20 +24,20 @@ def normalize_name(raw):
     )
 
 
-def merge_contacts(contacts):
-    """
-    contacts: list of dictionaries {name, phones[], emails[]}
+# Normalize email addresses
+def normalize_email(raw):
+    return (raw or "").strip().lower()
 
-    Returns a list of merged dictionaries:
-    {names: set, phones: set, emails: set, sources: int}
-    """
+
+# Merge duplicate contacts
+def merge_contacts(contacts):
 
     n = len(contacts)
     parent = list(range(n))
 
     def find(x):
         while parent[x] != x:
-            parent[x] = parent[parent[x]]  # Path compression
+            parent[x] = parent[parent[x]]
             x = parent[x]
 
         return x
@@ -55,10 +48,11 @@ def merge_contacts(contacts):
         if ra != rb:
             parent[rb] = ra
 
-    # Normalized copy of every contact
+    # Normalize all contacts
     norm = []
 
     for c in contacts:
+
         phones = {
             p for p in map(normalize_phone, c.get("phones", [])) if p
         }
@@ -102,8 +96,10 @@ def merge_contacts(contacts):
 
     for i, (name, phones, emails) in enumerate(norm):
 
+        root = find(i)
+
         g = groups.setdefault(
-            find(i),
+            root,
             {
                 "names": set(),
                 "phones": set(),
@@ -115,8 +111,55 @@ def merge_contacts(contacts):
         if name:
             g["names"].add(name)
 
-        g["phones"] |= phones
-        g["emails"] |= emails
+        g["phones"].update(phones)
+        g["emails"].update(emails)
         g["sources"] += 1
 
     return list(groups.values())
+
+
+# ==========================================
+# SAMPLE INPUT
+# ==========================================
+
+contacts = [
+    {
+        "name": "Dr. Ravi Kumar",
+        "phones": ["+91 98765-43210"],
+        "emails": ["RAVI@gmail.com"]
+    },
+    {
+        "name": "Ravi Kumar",
+        "phones": ["9876543210"],
+        "emails": ["ravi@gmail.com"]
+    },
+    {
+        "name": "Mr. Arun",
+        "phones": ["9876543211"],
+        "emails": ["arun@gmail.com"]
+    },
+    {
+        "name": "Arun",
+        "phones": [],
+        "emails": ["arun@gmail.com"]
+    }
+]
+
+
+# ==========================================
+# DISPLAY FINAL RESULT
+# ==========================================
+
+result = merge_contacts(contacts)
+
+print("========== MERGED CONTACTS ==========")
+
+for i, contact in enumerate(result, start=1):
+
+    print("\nContact", i)
+    print("Names:", sorted(contact["names"]))
+    print("Phones:", sorted(contact["phones"]))
+    print("Emails:", sorted(contact["emails"]))
+    print("Sources:", contact["sources"])
+
+print("\nContact merging completed successfully!")
